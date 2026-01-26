@@ -1,0 +1,102 @@
+name: Fetch and convert images
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_message:
+        description: "Commit message"
+        required: true
+        type: string
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y webp jq
+      
+      - name: Checkout ArknightsAssets repo
+        uses: actions/checkout@v4
+        with:
+          repository: ArknightsAssets/ArknightsAssets2
+          ref: cn
+          path: source
+          sparse-checkout: |
+            assets/dyn/arts/charavatars
+            assets/dyn/arts/charportraits
+            assets/dyn/arts/characters
+            assets/dyn/arts/skills
+            assets/dyn/arts/rarity_hub
+            assets/dyn/arts/elite_hub
+            assets/dyn/arts/potential_hub
+            assets/dyn/arts/ui/\[uc\]charcommon/dynprofession
+            assets/dyn/arts/ui/subprofessionicon
+            assets/dyn/arts/number_hub
+            assets/dyn/arts/specialized_hub
+            assets/dyn/arts/uniequipimg
+            assets/dyn/arts/ui/uniequiptype
+            assets/dyn/ui/\[pack\]commoncharselect/common_char_select_default_card_panel
+          sparse-checkout-cone-mode: false
+          fetch-depth: 0
+      
+      - name: Convert images
+        run: |
+          set -e
+      
+          SRC_ROOT="source"
+          LAST_SHA=$(jq -r '.ArknightsAssets' .sources.json)
+      
+          declare -A FOLDERS
+          FOLDERS["assets/dyn/arts/charavatars"]="assets/avatars"
+          FOLDERS["assets/dyn/arts/charportraits"]="assets/portraits"
+          FOLDERS["assets/dyn/arts/characters"]="assets/arts"
+          FOLDERS["assets/dyn/arts/skills"]="assets/skills"
+          FOLDERS["assets/dyn/arts/rarity_hub"]="assets/ui/stars"
+          FOLDERS["assets/dyn/arts/elite_hub"]="assets/ui/elite"
+          FOLDERS["assets/dyn/arts/potential_hub"]="assets/ui/potential"
+          FOLDERS["assets/dyn/arts/ui/[uc]charcommon/dynprofession"]="assets/ui/profession"
+          FOLDERS["assets/dyn/arts/ui/subprofessionicon"]="assets/ui/subprofession"
+          FOLDERS["assets/dyn/arts/number_hub"]="assets/ui/skill_level"
+          FOLDERS["assets/dyn/arts/specialized_hub"]="assets/ui/skill_mastery"
+          FOLDERS["assets/dyn/arts/uniequipimg"]="assets/module_img"
+          FOLDERS["assets/dyn/arts/ui/uniequiptype"]="assets/ui/module_type"
+          FOLDERS["assets/dyn/ui/[pack]commoncharselect/common_char_select_default_card_panel"]="assets/ui/char_card"
+      
+          for SRC_SUB in "${!FOLDERS[@]}"; do
+            DST_SUB="${FOLDERS[$SRC_SUB]}"
+      
+            mkdir -p "$DST_SUB"
+      
+            git -C "$SRC_ROOT" diff -z --name-only "$LAST_SHA"..HEAD -- "$SRC_SUB" \
+            | while IFS= read -r -d '' file; do
+                src="$SRC_ROOT/$file"
+                dst="$DST_SUB/$(basename "${file%.png}.webp")"
+                cwebp "$src" -o "$dst"
+            done
+      
+          done
+
+          NEW_SHA=$(git -C "$SRC_ROOT" rev-parse HEAD)
+          jq ".sourceRepo = \"${NEW_SHA}\"" .sources.json > .sources.tmp
+          mv .sources.tmp .sources.json
+          
+      - name: Commit results
+        run: |
+          git status --porcelain
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+          git add assets .sources.json
+            git commit -m "${{ inputs.commit_message }}"
+            git push
+          else
+            echo "No changes to commit"
+          fi
