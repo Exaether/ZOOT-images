@@ -26,12 +26,18 @@ FOLDERS_MAPPING = {
     "assets/dyn/arts/uniequipimg": "assets/module_img",
     "assets/dyn/arts/ui/uniequiptype": "assets/ui/module_type",
     "assets/dyn/ui/[pack]commoncharselect/common_char_select_default_card_panel": "assets/ui/char_card",
+    "assets/dyn/avg/characters": "assets/story/characters",
+    "assets/dyn/avg/backgrounds": "assets/story/backgrounds",
+    "assets/dyn/avg/images": "assets/story/images",
+    "assets/dyn/avg/items": "assets/story/items",
+    "assets/dyn/avg/animatedkv": "assets/story/animatedkv",
 }
 
 
 def run_command(cmd, cwd=None):
     """Helper to run shell commands."""
-    subprocess.run(cmd, check=True, shell=True, cwd=cwd, stdout=subprocess.PIPE)
+    subprocess.run(cmd, check=True, shell=True,
+                   cwd=cwd, stdout=subprocess.PIPE)
 
 
 def get_last_sha():
@@ -79,16 +85,16 @@ def main():
     # 1. Setup Source Repo
     if not os.path.exists(SOURCE_DIR):
         print(f"Cloning {SOURCE_REPO_URL}...")
-        run_command(
-            f"git clone --depth=1 -b cn --filter=blob:none --sparse {SOURCE_REPO_URL} {SOURCE_DIR}"
-        )
+        run_command(f"git clone --depth=1 -b cn --filter=blob:none --sparse {
+            SOURCE_REPO_URL} {SOURCE_DIR}")
         print("Cloning done")
 
         # Configure sparse checkout
         cwd = os.getcwd()
         os.chdir(SOURCE_DIR)
         sparse_paths = (
-            " ".join(FOLDERS_MAPPING.keys()).replace("[", "\\[").replace("]", "\\]")
+            " ".join(FOLDERS_MAPPING.keys()).replace(
+                "[", "\\[").replace("]", "\\]")
         )
         run_command(f"git sparse-checkout set {sparse_paths} --skip-checks")
         os.chdir(cwd)
@@ -108,7 +114,8 @@ def main():
         print("Already up to date.")
         return
 
-    print(f"Syncing from {last_sha if last_sha else 'beginning'} to {current_sha}")
+    print(f"Syncing from {
+          last_sha if last_sha else 'beginning'} to {current_sha}")
 
     changed_files = []
     if last_sha:
@@ -139,7 +146,7 @@ def main():
             rel_path = os.path.relpath(fpath, matched_src_folder)
             full_src = os.path.join(SOURCE_DIR, fpath)
 
-            file_name = os.path.splitext(os.path.basename(rel_path))[0] + ".webp"
+            file_name = os.path.splitext(rel_path)[0] + ".webp"
             full_dst = os.path.join(target_folder, file_name)
 
             tasks.append((full_src, full_dst))
